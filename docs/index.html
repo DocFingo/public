@@ -2,51 +2,563 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="10" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello, Fusionists!</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Tetris</title>
   <style>
-    body {
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #111;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Italian flag side panels */
+    #side-left, #side-right {
+      position: fixed; top: 0; bottom: 0;
+      display: flex; flex-direction: column;
+      z-index: 0;
+    }
+    #side-left  { left: 0; }
+    #side-right { right: 0; }
+    .it-stripe { flex: 1; }
+    /* Italian flag: green | white | red */
+    #side-left  .it-stripe:nth-child(1) { background: #009246; }
+    #side-left  .it-stripe:nth-child(2) { background: #ffffff; }
+    #side-left  .it-stripe:nth-child(3) { background: #ce2b37; }
+    #side-right .it-stripe:nth-child(1) { background: #009246; }
+    #side-right .it-stripe:nth-child(2) { background: #ffffff; }
+    #side-right .it-stripe:nth-child(3) { background: #ce2b37; }
+
+    #game-wrap {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; flex-direction: column; align-items: center;
+      z-index: 1;
+    }
+    canvas {
+      display: block;
+      border-left: 1px solid #333;
+      border-right: 1px solid #333;
+      border-top: 1px solid #333;
+      image-rendering: pixelated;
+      position: relative; z-index: 5;
+    }
+    #dropzone {
+      position: fixed;
+      border: 2px dashed rgba(128,128,128,0.50);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      z-index: 2;
+      color: rgba(128,128,128,0.50);
+    }
+    #btn-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-around;
+      z-index: 10;
+    }
+    .btn {
+      display: flex; align-items: center; justify-content: center;
+      border: 2.5px dashed rgba(200,200,200,0.75);
+      border-radius: 14px;
+      color: rgba(220,220,220,0.85);
+      background: transparent;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn.active { background: rgba(255,255,255,0.07); }
+    #overlay {
+      position: fixed;
+      background: rgba(0,0,0,0.58);
+      z-index: 15;
+      pointer-events: none;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 0.5rem;
+    }
+    #overlay h2 {
+      font-size: 1.5rem;
+      letter-spacing: 0.1em;
+      color: #e0e0ff;
       font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: -ms-flexbox;
-      display: flex;
-      -webkit-box-orient: vertical;
-      -webkit-box-direction: normal;
-      -webkit-flex-direction: column;
-      -ms-flex-direction: column;
-      flex-direction: column;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      -ms-flex-align: center;
-      align-items: center;
-      -webkit-box-pack: center;
-      -webkit-justify-content: center;
-      -ms-flex-pack: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background: #f7f8fa;
-      color: #1f2328;
-      text-align: center;
     }
-    h1 { font-size: 2.5rem; margin-bottom: 0.25rem; text-align: center; }
-    p  { color: #57606a; font-size: 1rem; text-align: center; }
-    .badge {
-      margin-top: 2rem;
-      padding: 0.4rem 0.9rem;
-      background: #3b82d4;
-      color: #fff;
-      border-radius: 999px;
-      font-size: 0.85rem;
+    #overlay p {
+      font-size: 0.82rem;
+      color: #aaa;
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
     }
+    #overlay { display: none; }
   </style>
 </head>
 <body>
-  <h1>Hello &#x269B;&#xFE0E;-ists!</h1>
-  <p>Wait for this page to change.</p>
-  <span class="badge">GitHub Pages · public</span>
-  <p style="color:#57606a;font-size:0.8rem;margin-top:3rem;">Last loaded: <script>document.write(new Date().toLocaleTimeString())</script></p>
+
+<!-- Italian flag side panels -->
+<div id="side-left">
+  <div class="it-stripe"></div>
+  <div class="it-stripe"></div>
+  <div class="it-stripe"></div>
+</div>
+<div id="side-right">
+  <div class="it-stripe"></div>
+  <div class="it-stripe"></div>
+  <div class="it-stripe"></div>
+</div>
+
+<div id="game-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="dropzone"></div>
+
+<div id="btn-bar">
+  <button class="btn" id="btnL">&#x21E6;</button>
+  <button class="btn" id="btnR2">&#x21BB;</button>
+  <button class="btn" id="btnR">&#x21E8;</button>
+</div>
+
+<div id="overlay"><h2 id="ovTitle"></h2><p id="ovSub"></p></div>
+
+<script>
+(function(){
+"use strict";
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const COLS = 10, ROWS = 20, DROP_ROWS = 4, BTN_ROWS = 4;
+const COLORS = [
+  null,
+  '#00cfcf', // I - cyan
+  '#f0a000', // O - orange
+  '#a000f0', // T - purple
+  '#00b800', // S - green
+  '#c00000', // Z - red
+  '#0000d0', // J - blue
+  '#e06000', // L - amber
+];
+const PIECES = [
+  null,
+  [[1,1,1,1]],                          // I
+  [[1,1],[1,1]],                         // O
+  [[0,1,0],[1,1,1]],                     // T
+  [[0,1,1],[1,1,0]],                     // S
+  [[1,1,0],[0,1,1]],                     // Z
+  [[1,0,0],[1,1,1]],                     // J
+  [[0,0,1],[1,1,1]],                     // L
+];
+
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const canvas   = document.getElementById('c');
+const ctx      = canvas.getContext('2d');
+const overlay  = document.getElementById('overlay');
+const ovTitle  = document.getElementById('ovTitle');
+const ovSub    = document.getElementById('ovSub');
+const dropzone = document.getElementById('dropzone');
+const btnL     = document.getElementById('btnL');
+const btnR2    = document.getElementById('btnR2');
+const btnR     = document.getElementById('btnR');
+const btnBar   = document.getElementById('btn-bar');
+
+// ── Sizing ───────────────────────────────────────────────────────────────────
+let BLOCK, btnSide, gap, canvasLeft, canvasTop;
+
+function resize() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  BLOCK   = Math.floor(vh / (ROWS + BTN_ROWS));
+  btnSide = BTN_ROWS * BLOCK;
+  gap     = Math.floor((vw - 3 * btnSide) / 4);
+
+  canvas.width  = COLS * BLOCK;
+  canvas.height = ROWS * BLOCK;
+
+  // Centre canvas horizontally, top=0
+  const cw = canvas.width;
+  canvasLeft = Math.floor((vw - cw) / 2);
+  canvasTop  = 0;
+  canvas.style.position = 'fixed';
+  canvas.style.left     = canvasLeft + 'px';
+  canvas.style.top      = '0';
+
+  // Size the Italian side panels to canvas edges
+  const sideLeft  = document.getElementById('side-left');
+  const sideRight = document.getElementById('side-right');
+  sideLeft.style.width  = canvasLeft + 'px';
+  sideRight.style.width = (vw - canvasLeft - cw) + 'px';
+
+  // Drop zone
+  dropzone.style.left   = gap + 'px';
+  dropzone.style.right  = gap + 'px';
+  dropzone.style.height = btnSide + 'px';
+  dropzone.style.bottom = btnSide + 'px';
+  dropzone.style.fontSize = Math.round(DROP_ROWS * BLOCK * 0.55) + 'px';
+  dropzone.textContent = '\u21E9';
+
+  // Button bar
+  btnBar.style.height = btnSide + 'px';
+  [btnL, btnR2, btnR].forEach(b => {
+    b.style.width  = btnSide + 'px';
+    b.style.height = btnSide + 'px';
+    const fs = Math.round(btnSide * 0.5 * 1.33);
+    b.style.fontSize = fs + 'px';
+    b.style.paddingTop    = '0';
+    b.style.paddingBottom = Math.round(fs * 0.5) + 'px';
+  });
+  // ↻ nudge
+  const fs2 = Math.round(btnSide * 0.5 * 1.33);
+  btnR2.style.paddingTop    = Math.round(fs2 * 0.08) + 'px';
+  btnR2.style.paddingBottom = Math.round(fs2 * 0.5 - fs2 * 0.08) + 'px';
+
+  // Overlay
+  overlay.style.left   = canvasLeft + 'px';
+  overlay.style.top    = '0';
+  overlay.style.width  = cw + 'px';
+  overlay.style.height = (ROWS * BLOCK) + 'px';
+
+  draw();
+}
+
+window.addEventListener('resize', resize);
+
+// ── Game state ───────────────────────────────────────────────────────────────
+let board, score, piece, pieceX, pieceY, pieceType, nextType;
+let paused, gameOver, dropTimer, gameLoop;
+let level, linesCleared;
+
+function newBoard() {
+  return Array.from({length: ROWS}, () => new Array(COLS).fill(0));
+}
+
+function randomType() { return 1 + Math.floor(Math.random() * 7); }
+
+function spawnPiece() {
+  pieceType = nextType || randomType();
+  nextType  = randomType();
+  piece  = PIECES[pieceType];
+  pieceX = Math.floor((COLS - piece[0].length) / 2);
+  pieceY = 0;
+  if (collides(piece, pieceX, pieceY)) {
+    triggerGameOver();
+  }
+}
+
+function startGame() {
+  board        = newBoard();
+  score        = 0;
+  linesCleared = 0;
+  level        = 1;
+  paused       = false;
+  gameOver     = false;
+  nextType     = randomType();
+  spawnPiece();
+  hideOverlay();
+  scheduleLoop();
+}
+
+function triggerGameOver() {
+  gameOver = true;
+  clearTimeout(dropTimer);
+  showOverlay('GAME OVER', 'Tap to restart');
+}
+
+// ── Collision ─────────────────────────────────────────────────────────────────
+function collides(p, px, py) {
+  for (let r = 0; r < p.length; r++)
+    for (let c = 0; c < p[r].length; c++)
+      if (p[r][c]) {
+        const nx = px + c, ny = py + r;
+        if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+        if (ny >= 0 && board[ny][nx]) return true;
+      }
+  return false;
+}
+
+// ── Rotation ──────────────────────────────────────────────────────────────────
+function rotateCW(p) {
+  const R = p.length, C = p[0].length;
+  const out = Array.from({length: C}, () => new Array(R).fill(0));
+  for (let r = 0; r < R; r++)
+    for (let c = 0; c < C; c++)
+      out[c][R - 1 - r] = p[r][c];
+  return out;
+}
+
+function tryRotate() {
+  const np = rotateCW(piece);
+  const kicks = [0, 1, -1, 2, -2];
+  for (const k of kicks)
+    if (!collides(np, pieceX + k, pieceY)) {
+      piece  = np;
+      pieceX += k;
+      return;
+    }
+}
+
+// ── Movement ──────────────────────────────────────────────────────────────────
+function moveLeft()  { if (!collides(piece, pieceX - 1, pieceY)) pieceX--; draw(); }
+function moveRight() { if (!collides(piece, pieceX + 1, pieceY)) pieceX++; draw(); }
+function rotate()    { tryRotate(); draw(); }
+
+function softDrop() {
+  if (!collides(piece, pieceX, pieceY + 1)) {
+    pieceY++;
+    draw();
+    return true;
+  }
+  lock();
+  return false;
+}
+
+function hardDrop() {
+  while (!collides(piece, pieceX, pieceY + 1)) pieceY++;
+  lock();
+}
+
+function lock() {
+  for (let r = 0; r < piece.length; r++)
+    for (let c = 0; c < piece[r].length; c++)
+      if (piece[r][c] && (pieceY + r) >= 0)
+        board[pieceY + r][pieceX + c] = pieceType;
+  clearLines();
+  spawnPiece();
+  draw();
+}
+
+function clearLines() {
+  let cleared = 0;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(v => v)) {
+      board.splice(r, 1);
+      board.unshift(new Array(COLS).fill(0));
+      cleared++;
+      r++;
+    }
+  }
+  if (cleared) {
+    const pts = [0, 100, 300, 500, 800];
+    score += (pts[cleared] || 800) * level;
+    linesCleared += cleared;
+    level = 1 + Math.floor(linesCleared / 10);
+  }
+}
+
+// ── Ghost ─────────────────────────────────────────────────────────────────────
+function ghostY() {
+  let gy = pieceY;
+  while (!collides(piece, pieceX, gy + 1)) gy++;
+  return gy;
+}
+
+// ── Loop ──────────────────────────────────────────────────────────────────────
+function dropInterval() { return Math.max(80, 700 - (level - 1) * 60); }
+
+function scheduleLoop() {
+  clearTimeout(dropTimer);
+  if (!paused && !gameOver)
+    dropTimer = setTimeout(tick, dropInterval());
+}
+
+function tick() {
+  softDrop();
+  scheduleLoop();
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function drawBlock(x, y, color, alpha) {
+  ctx.globalAlpha = alpha !== undefined ? alpha : 1;
+  ctx.fillStyle = color;
+  ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK);
+  // 15% white top highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, Math.max(1, Math.round(BLOCK * 0.15)));
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  if (!BLOCK) return;
+  const W = COLS * BLOCK, H = ROWS * BLOCK;
+
+  // 1. Background
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Subtle grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let c = 0; c <= COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(c * BLOCK, 0); ctx.lineTo(c * BLOCK, H); ctx.stroke();
+  }
+  for (let r = 0; r <= ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r * BLOCK); ctx.lineTo(W, r * BLOCK); ctx.stroke();
+  }
+
+  // 3. Border ticks
+  const tickW = Math.round(BLOCK * 0.22), tickH = Math.round(BLOCK * 0.35);
+  ctx.fillStyle = 'rgba(160,160,220,0.18)';
+  for (let r = 0; r < ROWS; r++) {
+    const ty = r * BLOCK + Math.round((BLOCK - tickH) / 2);
+    ctx.fillRect(0, ty, tickW, tickH);
+    ctx.fillRect(W - tickW, ty, tickW, tickH);
+  }
+
+  // 4. Pause hint "II" — only when NOT paused
+  if (!paused && !gameOver) {
+    const pauseFS = Math.round(BLOCK * 16 * 0.127);
+    ctx.font = `bold ${pauseFS}px -apple-system, "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(200,200,200,0.25)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('II', W / 2, (16 / 2) * BLOCK);
+  }
+
+  // 5. Locked blocks
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (board[r][c]) drawBlock(c, r, COLORS[board[r][c]]);
+
+  // 6. Ghost piece
+  if (!gameOver) {
+    const gy = ghostY();
+    for (let r = 0; r < piece.length; r++)
+      for (let c = 0; c < piece[r].length; c++)
+        if (piece[r][c])
+          drawBlock(pieceX + c, pieceY + r === gy + r ? gy + r : gy + r,
+                    COLORS[pieceType], 0.18);
+  }
+
+  // 7. Active piece
+  if (!gameOver) {
+    for (let r = 0; r < piece.length; r++)
+      for (let c = 0; c < piece[r].length; c++)
+        if (piece[r][c]) drawBlock(pieceX + c, pieceY + r, COLORS[pieceType]);
+  }
+
+  // 8. Score overlay
+  const scoreFontSize = Math.max(10, Math.round(BLOCK * 0.55));
+  ctx.font = `bold ${scoreFontSize}px -apple-system, "Segoe UI", system-ui, sans-serif`;
+  ctx.fillStyle = 'rgba(210,210,210,0.65)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('SCORE  ' + score, W / 2, BLOCK * 0.5);
+}
+
+// ── Overlay ────────────────────────────────────────────────────────────────────
+function showOverlay(title, sub) {
+  ovTitle.textContent = title;
+  ovSub.textContent   = sub;
+  overlay.style.display = 'flex';
+}
+function hideOverlay() { overlay.style.display = 'none'; }
+
+// ── Pause ──────────────────────────────────────────────────────────────────────
+function togglePause() {
+  if (gameOver) return;
+  paused = !paused;
+  if (paused) {
+    clearTimeout(dropTimer);
+    showOverlay('PAUSED', 'Tap to resume');
+  } else {
+    hideOverlay();
+    scheduleLoop();
+  }
+  draw();
+}
+
+// ── Touch on canvas ────────────────────────────────────────────────────────────
+let touchStartY = null, touchStartTime = null, softDropHoldTimer = null;
+
+function canvasRowOf(touchY) {
+  const relY = touchY - canvasTop;
+  return Math.floor(relY / BLOCK);
+}
+
+function startSoftDropHold() {
+  softDrop();
+  clearInterval(softDropHoldTimer);
+  softDropHoldTimer = setInterval(() => { if (!paused && !gameOver) softDrop(); }, 100);
+}
+function stopSoftDropHold() {
+  clearInterval(softDropHoldTimer);
+  softDropHoldTimer = null;
+}
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  touchStartY    = t.clientY;
+  touchStartTime = Date.now();
+  const row = canvasRowOf(t.clientY);
+  if (row >= ROWS - DROP_ROWS) {
+    // Bottom drop zone — immediate drop + hold
+    if (!paused && !gameOver) startSoftDropHold();
+  }
+}, {passive: false});
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  stopSoftDropHold();
+  const row = canvasRowOf(touchStartY);
+  const dt  = Date.now() - touchStartTime;
+  if (row < ROWS - DROP_ROWS) {
+    // Upper area — tap = pause / restart
+    if (dt < 300) {
+      if (gameOver) startGame();
+      else togglePause();
+    }
+  }
+}, {passive: false});
+
+canvas.addEventListener('touchcancel', e => { stopSoftDropHold(); }, {passive: false});
+
+// ── Button controls ────────────────────────────────────────────────────────────
+function makeRepeat(action) {
+  let timer = null;
+  function start(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('active');
+    if (!paused && !gameOver) action();
+    timer = setInterval(() => { if (!paused && !gameOver) action(); }, 120);
+  }
+  function stop(e) {
+    e.currentTarget.classList.remove('active');
+    clearInterval(timer); timer = null;
+  }
+  return { start, stop };
+}
+
+const rL  = makeRepeat(moveLeft);
+const rR  = makeRepeat(moveRight);
+const rR2 = makeRepeat(rotate);
+
+['touchstart','mousedown'].forEach(ev => {
+  btnL.addEventListener(ev,  rL.start,  {passive: false});
+  btnR.addEventListener(ev,  rR.start,  {passive: false});
+  btnR2.addEventListener(ev, rR2.start, {passive: false});
+});
+['touchend','touchcancel','mouseup','mouseleave'].forEach(ev => {
+  btnL.addEventListener(ev,  rL.stop);
+  btnR.addEventListener(ev,  rR.stop);
+  btnR2.addEventListener(ev, rR2.stop);
+});
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (gameOver) { if (e.key === 'Enter' || e.key === ' ') startGame(); return; }
+  switch (e.key) {
+    case 'ArrowLeft':  e.preventDefault(); if (!paused) moveLeft();  break;
+    case 'ArrowRight': e.preventDefault(); if (!paused) moveRight(); break;
+    case 'ArrowUp': case 'x': case 'X': e.preventDefault(); if (!paused) rotate(); break;
+    case 'ArrowDown': e.preventDefault(); if (!paused) softDrop();  break;
+    case ' ':          e.preventDefault(); if (!paused) hardDrop();  break;
+    case 'p': case 'P': togglePause(); break;
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+resize();
+startGame();
+
+})();
+</script>
 </body>
 </html>
