@@ -375,7 +375,7 @@ function drawBlock(x, y, color, alpha) {
 }
 
 function draw() {
-  if (!BLOCK) return;
+  if (!BLOCK || !board) return;
   const W = COLS * BLOCK, H = ROWS * BLOCK;
 
   // 1. Background
@@ -497,13 +497,14 @@ canvas.addEventListener('touchstart', e => {
 canvas.addEventListener('touchend', e => {
   e.preventDefault();
   stopSoftDropHold();
-  const row = canvasRowOf(touchStartY);
-  const dt  = Date.now() - touchStartTime;
-  if (row < ROWS - DROP_ROWS) {
-    // Upper area — tap = pause / restart
-    if (dt < 300) {
-      if (gameOver) startGame();
-      else togglePause();
+  const dt = Date.now() - touchStartTime;
+  if (dt < 300) {
+    if (gameOver) {
+      // Tap anywhere on canvas restarts after game over
+      startGame();
+    } else {
+      const row = canvasRowOf(touchStartY);
+      if (row < ROWS - DROP_ROWS) togglePause();
     }
   }
 }, {passive: false});
